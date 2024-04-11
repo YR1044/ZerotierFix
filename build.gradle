@@ -2,7 +2,7 @@
 buildscript {
     repositories {
         google()
-        jcenter()
+        mavenCentral()
     }
     dependencies {
         classpath 'com.android.tools.build:gradle:7.4.2'
@@ -16,8 +16,14 @@ buildscript {
 allprojects {
     repositories {
         google()
-        jcenter()
+        mavenCentral()
     }
+}
+
+ext {
+    compileSdkVersion = 33
+    minSdkVersion = 19
+    targetSdkVersion = 33
 }
 
 task clean(type: Delete) {

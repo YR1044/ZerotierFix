@@ -20,15 +20,14 @@ import androidx.core.content.ContextCompat;
 import com.zerotier.sdk.Event;
 import com.zerotier.sdk.EventListener;
 import com.zerotier.sdk.Node;
-import com.zerotier.sdk.NodeException;
 import com.zerotier.sdk.ResultCode;
 import com.zerotier.sdk.VirtualNetworkConfig;
 import com.zerotier.sdk.VirtualNetworkConfigListener;
 import com.zerotier.sdk.VirtualNetworkConfigOperation;
 import com.zerotier.sdk.VirtualNetworkStatus;
 
-import net.kaaass.zerotierfix.ZerotierFixApplication;
 import net.kaaass.zerotierfix.R;
+import net.kaaass.zerotierfix.ZerotierFixApplication;
 import net.kaaass.zerotierfix.events.AfterJoinNetworkEvent;
 import net.kaaass.zerotierfix.events.ErrorEvent;
 import net.kaaass.zerotierfix.events.IsServiceRunningReplyEvent;
@@ -36,14 +35,14 @@ import net.kaaass.zerotierfix.events.IsServiceRunningRequestEvent;
 import net.kaaass.zerotierfix.events.ManualDisconnectEvent;
 import net.kaaass.zerotierfix.events.NetworkConfigChangedByUserEvent;
 import net.kaaass.zerotierfix.events.NetworkListReplyEvent;
+import net.kaaass.zerotierfix.events.NetworkListRequestEvent;
 import net.kaaass.zerotierfix.events.NetworkReconfigureEvent;
 import net.kaaass.zerotierfix.events.NodeDestroyedEvent;
 import net.kaaass.zerotierfix.events.NodeIDEvent;
 import net.kaaass.zerotierfix.events.NodeStatusEvent;
+import net.kaaass.zerotierfix.events.NodeStatusRequestEvent;
 import net.kaaass.zerotierfix.events.OrbitMoonEvent;
 import net.kaaass.zerotierfix.events.PeerInfoReplyEvent;
-import net.kaaass.zerotierfix.events.NetworkListRequestEvent;
-import net.kaaass.zerotierfix.events.NodeStatusRequestEvent;
 import net.kaaass.zerotierfix.events.PeerInfoRequestEvent;
 import net.kaaass.zerotierfix.events.StopEvent;
 import net.kaaass.zerotierfix.events.VPNErrorEvent;
@@ -66,12 +65,8 @@ import org.greenrobot.eventbus.EventBus;
 import org.greenrobot.eventbus.Subscribe;
 import org.greenrobot.eventbus.ThreadMode;
 
-import java.io.BufferedReader;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
-import java.io.FileReader;
-import java.io.IOException;
 import java.net.DatagramSocket;
 import java.net.Inet4Address;
 import java.net.Inet6Address;
@@ -80,6 +75,7 @@ import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
@@ -112,39 +108,17 @@ public class ZeroTierOneService extends VpnService implements Runnable, EventLis
     private Thread udpThread;
     private Thread v4MulticastScanner = new Thread() {
         /* class com.zerotier.one.service.ZeroTierOneService.AnonymousClass1 */
-        ArrayList<String> subscriptions = new ArrayList<>();
+        List<String> subscriptions = new ArrayList<>();
 
         @Override
         public void run() {
             Log.d(ZeroTierOneService.TAG, "IPv4 Multicast Scanner Thread Started.");
             while (!isInterrupted()) {
                 try {
-                    ArrayList<String> arrayList = new ArrayList<>();
-                    try {
-                        BufferedReader bufferedReader = new BufferedReader(new FileReader("/proc/net/igmp"));
-                        while (true) {
-                            boolean z = false;
-                            while (true) {
-                                String readLine = bufferedReader.readLine();
-                                if (readLine == null) {
-                                    break;
-                                }
-                                String[] split = readLine.split("\\s+", -1);
-                                if (!z && split[1].equals("tun0")) {
-                                    z = true;
-                                } else if (z && split[0].equals("")) {
-                                    arrayList.add(split[1]);
-                                }
-                            }
-                        }
-                    } catch (FileNotFoundException e) {
-                        Log.e(ZeroTierOneService.TAG, "File Not Found: /proc/net/igmp", e);
-                    } catch (IOException e) {
-                        Log.e(ZeroTierOneService.TAG, "Error parsing /proc/net/igmp", e);
-                    }
+                    List<String> groups = NetworkInfoUtils.listMulticastGroupOnInterface("tun0", false);
 
                     ArrayList<String> arrayList2 = new ArrayList<>(this.subscriptions);
-                    ArrayList<String> arrayList3 = new ArrayList<>(arrayList);
+                    ArrayList<String> arrayList3 = new ArrayList<>(groups);
                     arrayList3.removeAll(arrayList2);
                     for (String str : arrayList3) {
                         try {
@@ -162,7 +136,7 @@ public class ZeroTierOneService extends VpnService implements Runnable, EventLis
                             Log.e(ZeroTierOneService.TAG, e.toString(), e);
                         }
                     }
-                    arrayList2.removeAll(new ArrayList<>(arrayList));
+                    arrayList2.removeAll(new ArrayList<>(groups));
                     for (String str2 : arrayList2) {
                         try {
                             byte[] hexStringToByteArray2 = StringUtils.hexStringToBytes(str2);
@@ -179,10 +153,11 @@ public class ZeroTierOneService extends VpnService implements Runnable, EventLis
                             Log.e(ZeroTierOneService.TAG, e.toString(), e);
                         }
                     }
-                    this.subscriptions = arrayList;
+                    this.subscriptions = groups;
                     Thread.sleep(1000);
                 } catch (InterruptedException e) {
                     Log.d(ZeroTierOneService.TAG, "V4 Multicast Scanner Thread Interrupted", e);
+                    break;
                 }
             }
             Log.d(ZeroTierOneService.TAG, "IPv4 Multicast Scanner Thread Ended.");
@@ -190,33 +165,17 @@ public class ZeroTierOneService extends VpnService implements Runnable, EventLis
     };
     private Thread v6MulticastScanner = new Thread() {
         /* class com.zerotier.one.service.ZeroTierOneService.AnonymousClass2 */
-        ArrayList<String> subscriptions = new ArrayList<>();
+        List<String> subscriptions = new ArrayList<>();
 
         @Override
         public void run() {
             Log.d(ZeroTierOneService.TAG, "IPv6 Multicast Scanner Thread Started.");
             while (!isInterrupted()) {
                 try {
-                    ArrayList<String> arrayList = new ArrayList<>();
-                    try {
-                        BufferedReader bufferedReader = new BufferedReader(new FileReader("/proc/net/igmp6"));
-                        while (true) {
-                            String readLine = bufferedReader.readLine();
-                            if (readLine == null) {
-                                break;
-                            }
-                            String[] split = readLine.split("\\s+", -1);
-                            if (split[1].equals("tun0")) {
-                                arrayList.add(split[2]);
-                            }
-                        }
-                    } catch (FileNotFoundException e) {
-                        Log.e(ZeroTierOneService.TAG, "File not found: /proc/net/igmp6", e);
-                    } catch (IOException e) {
-                        Log.e(ZeroTierOneService.TAG, "Error parsing /proc/net/igmp6", e);
-                    }
+                    List<String> groups = NetworkInfoUtils.listMulticastGroupOnInterface("tun0", true);
+
                     ArrayList<String> arrayList2 = new ArrayList<>(this.subscriptions);
-                    ArrayList<String> arrayList3 = new ArrayList<>(arrayList);
+                    ArrayList<String> arrayList3 = new ArrayList<>(groups);
                     arrayList3.removeAll(arrayList2);
                     for (String str : arrayList3) {
                         try {
@@ -228,7 +187,7 @@ public class ZeroTierOneService extends VpnService implements Runnable, EventLis
                             Log.e(ZeroTierOneService.TAG, e.toString(), e);
                         }
                     }
-                    arrayList2.removeAll(new ArrayList<>(arrayList));
+                    arrayList2.removeAll(new ArrayList<>(groups));
                     for (String str2 : arrayList2) {
                         try {
                             ResultCode multicastUnsubscribe = ZeroTierOneService.this.node.multicastUnsubscribe(ZeroTierOneService.this.networkId, TunTapAdapter.multicastAddressToMAC(InetAddress.getByAddress(StringUtils.hexStringToBytes(str2))));
@@ -239,10 +198,11 @@ public class ZeroTierOneService extends VpnService implements Runnable, EventLis
                             Log.e(ZeroTierOneService.TAG, e.toString(), e);
                         }
                     }
-                    this.subscriptions = arrayList;
+                    this.subscriptions = groups;
                     Thread.sleep(1000);
                 } catch (InterruptedException e) {
                     Log.d(ZeroTierOneService.TAG, "V6 Multicast Scanner Thread Interrupted", e);
+                    break;
                 }
             }
             Log.d(ZeroTierOneService.TAG, "IPv6 Multicast Scanner Thread Ended.");
@@ -392,51 +352,53 @@ public class ZeroTierOneService extends VpnService implements Runnable, EventLis
 
                 // 创建本地节点
                 if (this.node == null) {
-                    try {
-                        this.udpCom = new UdpCom(this, this.svrSocket);
-                        this.tunTapAdapter = new TunTapAdapter(this, networkId);
+                    this.udpCom = new UdpCom(this, this.svrSocket);
+                    this.tunTapAdapter = new TunTapAdapter(this, networkId);
 
-                        // 创建节点对象并初始化
-                        var dataStore = this.dataStore;
-                        this.node = new Node(System.currentTimeMillis());
-                        this.node.init(dataStore, dataStore, this.udpCom, this, this.tunTapAdapter, this, null);
-                        this.onNodeStatusRequest(null);
+                    // 创建节点对象并初始化
+                    var dataStore = this.dataStore;
+                    this.node = new Node(System.currentTimeMillis());
+                    var result = this.node.init(dataStore, dataStore, this.udpCom, this, this.tunTapAdapter, this, null);
 
-                        // 持久化当前节点信息
-                        long address = this.node.address();
-                        DatabaseUtils.writeLock.lock();
-                        try {
-                            var appNodeDao = ((ZerotierFixApplication) getApplication())
-                                    .getDaoSession().getAppNodeDao();
-                            var nodesList = appNodeDao.queryBuilder().build()
-                                    .forCurrentThread().list();
-                            if (nodesList.isEmpty()) {
-                                var appNode = new AppNode();
-                                appNode.setNodeId(address);
-                                appNode.setNodeIdStr(String.format("%10x", address));
-                                appNodeDao.insert(appNode);
-                            } else {
-                                var appNode = nodesList.get(0);
-                                appNode.setNodeId(address);
-                                appNode.setNodeIdStr(String.format("%10x", address));
-                                appNodeDao.save(appNode);
-                            }
-                        } finally {
-                            DatabaseUtils.writeLock.unlock();
-                        }
-
-                        this.eventBus.post(new NodeIDEvent(address));
-                        this.udpCom.setNode(this.node);
-                        this.tunTapAdapter.setNode(this.node);
-
-                        // 启动 UDP 消息处理线程
-                        var thread = new Thread(this.udpCom, "UDP Communication Thread");
-                        this.udpThread = thread;
-                        thread.start();
-                    } catch (NodeException e) {
-                        Log.e(TAG, "Error starting ZT1 Node: " + e.getMessage(), e);
+                    if (result == ResultCode.RESULT_OK) {
+                        Log.d(TAG, "ZeroTierOne Node Initialized");
+                    } else {
+                        Log.e(TAG, "Error starting ZT1 Node: " + result);
                         return START_NOT_STICKY;
                     }
+                    this.onNodeStatusRequest(null);
+
+                    // 持久化当前节点信息
+                    long address = this.node.address();
+                    DatabaseUtils.writeLock.lock();
+                    try {
+                        var appNodeDao = ((ZerotierFixApplication) getApplication())
+                                .getDaoSession().getAppNodeDao();
+                        var nodesList = appNodeDao.queryBuilder().build()
+                                .forCurrentThread().list();
+                        if (nodesList.isEmpty()) {
+                            var appNode = new AppNode();
+                            appNode.setNodeId(address);
+                            appNode.setNodeIdStr(String.format("%10x", address));
+                            appNodeDao.insert(appNode);
+                        } else {
+                            var appNode = nodesList.get(0);
+                            appNode.setNodeId(address);
+                            appNode.setNodeIdStr(String.format("%10x", address));
+                            appNodeDao.save(appNode);
+                        }
+                    } finally {
+                        DatabaseUtils.writeLock.unlock();
+                    }
+
+                    this.eventBus.post(new NodeIDEvent(address));
+                    this.udpCom.setNode(this.node);
+                    this.tunTapAdapter.setNode(this.node);
+
+                    // 启动 UDP 消息处理线程
+                    var thread = new Thread(this.udpCom, "UDP Communication Thread");
+                    this.udpThread = thread;
+                    thread.start();
                 }
 
                 // 创建并启动 VPN 服务线程
@@ -983,12 +945,16 @@ public class ZeroTierOneService extends VpnService implements Runnable, EventLis
             channel.setDescription(description);
             this.notificationManager.createNotificationChannel(channel);
         }
+        int pendingIntentFlag = PendingIntent.FLAG_UPDATE_CURRENT;
+        if (Build.VERSION.SDK_INT >= 31) {
+            pendingIntentFlag |= PendingIntent.FLAG_IMMUTABLE;
+        }
         var pendingIntent =
                 PendingIntent.getActivity(this, 0,
-                        new Intent(this, NetworkListActivity.class),
-                        Build.VERSION.SDK_INT >= 23
-                                ? PendingIntent.FLAG_ONE_SHOT | PendingIntent.FLAG_UPDATE_CURRENT
-                                : PendingIntent.FLAG_UPDATE_CURRENT);
+                        new Intent(this, NetworkListActivity.class)
+                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP
+                                        | Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                        , pendingIntentFlag);
         var notification = new NotificationCompat.Builder(this, Constants.CHANNEL_ID)
                 .setPriority(1)
                 .setOngoing(true)

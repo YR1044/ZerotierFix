@@ -85,7 +85,7 @@
     <string name="moon_orbit_exist">Moon Orbit information exists!</string>
     <string name="moon_orbit_add_success">Moon orbit added successfully.</string>
     <string name="moon_orbit_delete_success">Moon orbit deleted successfully. Disconnect &amp; reconnect for this setting to take effect.</string>
-    <string name="unknown_version" translatable="false">-</string>
+    <string name="unknown_version" translatable="false">-.-.-</string>
     <string name="network_connected">Connected</string>
     <string name="connected_to_network">Connected to %s</string>
     <string name="network_detail">Network Detail</string>
@@ -115,7 +115,8 @@
     <string name="import_via_file">Import via file</string>
     <string name="url">URL</string>
     <string name="import_via_url">Import via URL</string>
-    <string name="cannot_copy_planet">Cannot copy planet file.</string>
+    <string name="cannot_open_planet">Cannot open planet file.</string>
+    <string name="cannot_open_moon">Cannot open moon file.</string>
     <string name="set_planet_file">Set planet file</string>
     <string name="wrong_url_format">Wrong url format</string>
     <string name="cannot_download_planet_file">Cannot download planet file</string>
@@ -134,7 +135,7 @@
     <string name="moon_wrong_file_format">Wrong moon file format</string>
     <string name="moon_world_id_hint">Zerotier address of Moon node. Also filename of its moon file.</string>
     <string name="cached_moon_file_delete">Cached moon file deleted. Reconnect for this setting to take effect.</string>
-    <string name="channel_name">ZeroTier Fix</string>
+    <string name="channel_name">Connection Status Notify</string>
     <string name="channel_description">Connection Status</string>
     <string name="notification_title_connected">Connected</string>
     <string name="notification_text_connected">Connected to: %1$s</string>
@@ -147,4 +148,9 @@
     <string name="toast_network_status_authentication_required">Cannot connect to network %1$s: Authorization required</string>
     <string name="toast_vpn_error">A VPN service error has occurred! %1$s</string>
     <string name="empty_network_name">Unknown</string>
+    <string name="app_version_format">(APP: %s)</string>
+    <string name="dialog_no_notification_alert_text">Zerotier Fix does not have notification permissions! You might miss notification pop-ups and status bar messages that indicate connection status. Zerotier Fix recommends you enable notification permissions for the app to receive connection status information. If you don\'t want to see persistent notifications in the status bar, you can still turn off messages for that notification category after enabling the permissions.</string>
+    <string name="dialog_no_notification_alert_title">Notification Permission Not Granted</string>
+    <string name="open_notification_settings">Goto notification settings</string>
+    <string name="dont_show_again">Don\'t show again</string>
 </resources>
